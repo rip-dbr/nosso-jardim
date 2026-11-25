@@ -1,0 +1,6 @@
+// Cache apenas após pedido explícito. Incrementar versão a cada publicação.
+const CACHE='jardim-presente-v4';
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+self.addEventListener('message',e=>{if(e.data?.type!=='CACHE_GARDEN')return;e.waitUntil((async()=>{try{const cache=await caches.open(CACHE);for(const path of ['./index.html','./manifest.webmanifest']){const request=new Request(new URL(path,self.registration.scope),{cache:'reload'});const response=await fetch(request);if(!response.ok||response.redirected)throw Error();const type=response.headers.get('content-type')||'';if(!type.includes(path.endsWith('html')?'text/html':'json'))throw Error();await cache.put(request,response)}e.ports[0]?.postMessage({ok:true})}catch{e.ports[0]?.postMessage({ok:false})}})())});
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;e.respondWith((async()=>{try{return await fetch(e.request)}catch{const cache=await caches.open(CACHE);const match=await cache.match(e.request);if(match)return match;if(e.request.mode==='navigate'){const page=await cache.match(new URL('./index.html',self.registration.scope));if(page)return page}return Response.error()}})())});
