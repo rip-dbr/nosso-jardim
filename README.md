@@ -4,7 +4,7 @@ Presente digital experimental em telas, com álbum interativo e um jardim para e
 
 ## Arquivos
 
-`index.html` contém layout, ilustrações, interações e conteúdo editável em `CONTENT`. `assets/missing-someone.mp3` e `assets/cupido.png` são os arquivos escolhidos para a música e o easter egg. Veja `assets/README.md`.
+`index.html` contém layout, ilustrações, interações e conteúdo editável em `CONTENT`. `assets/Bobby Chase - Missing Someone.mp3` e `assets/DBRCUPIDO.png` são os arquivos escolhidos para a música e o easter egg. Veja `assets/README.md`.
 
 ## Experiência
 
