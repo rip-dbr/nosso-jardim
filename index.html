@@ -35,7 +35,7 @@ function heading(card,tag,title){card.append(el('p','tag',tag));const h=el('h1',
 function picture(m){const fig=el('figure','picture'),flip=button('',()=>{const open=flip.getAttribute('aria-pressed')!=='true';flip.setAttribute('aria-pressed',String(open));flip.classList.toggle('flipped',open);flip.querySelector('.front').hidden=open;flip.querySelector('.photo-back').hidden=!open;burst({currentTarget:flip})},'flip-photo');flip.setAttribute('aria-label','Virar foto para ler o bilhete');flip.setAttribute('aria-pressed','false');const im=el('div','image front');if(m.photo){const img=new Image();img.alt=m.caption;img.src=m.photo;img.onerror=()=>{im.innerHTML=landscape()};im.append(img)}else im.innerHTML=landscape();const back=el('div','photo-back',m.note||IDEA_NOTES[CONTENT.memories.findIndex(x=>x.title===m.title)]||'Uma frase de vocês entra aqui.');back.hidden=true;flip.append(im,back);fig.append(flip,el('figcaption',null,m.caption));return fig}
 
 function render(){clearInterval(clockTimer);clockTimer=null;const s=screens[index],card=el('section','card');card.setAttribute('aria-label',s.title);if(s.kind==='memory')card.classList.add('album');document.body.classList.toggle('dusk-mode',index>=4);document.body.classList.toggle('night-mode',index>=letterIndex);$('horse').style.transform='translateX('+(index>=2?18:0)+'vw)';
-if(s.kind==='opening'){heading(card,'fiz uma coisa pra você',s.title);const env=button('',e=>{burst(e);go(1)},'envelope');env.setAttribute('aria-label','Abrir envelope e começar');card.append(env,el('p','copy','Eu poderia ter mandado uma mensagem. Mas resolvi dar um pouco mais de trabalho pra você abrir.'));actions(card,'Tá, deixa eu ver');card.append(el('p','small','Tem música no botão ali embaixo. Você escolhe.'))}
+if(s.kind==='opening'){heading(card,'fiz uma coisa pra você',s.title);const env=button('',e=>{burst(e);go(1)},'envelope');env.setAttribute('aria-label','Abrir envelope e começar');card.append(env,el('p','copy','Eu poderia ter mandado uma mensagem. Mas resolvi dar um pouco mais de trabalho pra você abrir.'));actions(card,'Tá, deixa eu ver');card.append(el('p','small','A música começa ao abrir ou no primeiro toque. Dá para pausar ali embaixo.'))}
 if(s.kind==='anniversary'){heading(card,'27 de novembro de 2025 · 22:36 · Brasília',s.title);card.append(el('p','copy','Foi aí que a gente começou. O resto ainda está acontecendo.'));const clock=el('div','clock');clock.id='clock';clock.setAttribute('role','timer');clock.setAttribute('aria-live','off');card.append(clock);card.append(button('E isso dá quantas horas?',()=>{clockHours=!clockHours;updateClock();},'text-button'));card.append(el('p','small','O contador continua mesmo quando você fecha esta página.'));actions(card,'Abre o álbum')}
 if(s.kind==='memory'){const layout=el('div','photo-layout'),text=el('div');layout.append(picture(s),text);heading(text,'toque na foto · tem um verso',s.title);text.append(el('p','copy',s.text));actions(text,index===letterIndex-2?'Fecha o álbum, mas olha isso':'Virar a página');card.append(layout)}
 if(s.kind==='flower'){heading(card,'um pequeno gesto',s.title);const b=button('',()=>{flowerOpen=true;b.classList.add('bloomed');$('flowerMessage').textContent=CONTENT.flowerMessage;next.hidden=false;burst({currentTarget:b})},'blossom'+(flowerOpen?' bloomed':''));b.innerHTML=flowerSVG;b.setAttribute('aria-label','Tocar para fazer a flor desabrochar');const msg=el('p','copy flower-message',flowerOpen?CONTENT.flowerMessage:'Pode tocar. Eu prometo que não é um botão de comprar nada.');msg.id='flowerMessage';card.append(b,msg);const next=actions(card,'Agora, uma carta');next.hidden=!flowerOpen}
@@ -52,7 +52,42 @@ if(matchMedia('(hover:hover) and (pointer:fine)').matches&&!reduce){let frame=0;
 let ctx,master,audio,playing=false,timer,step=0;
 function chord(){if(!playing||!ctx)return;const chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,261.63],[196,246.94,293.66]];chords[step++%4].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+i*.22;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.04,t+.1);g.gain.exponentialRampToValueAtTime(.0001,t+3);o.connect(g);g.connect(master);o.start(t);o.stop(t+3.1)});timer=setTimeout(chord,3400)}
 function stopMusic(){playing=false;clearTimeout(timer);if(audio)audio.pause();if(ctx)ctx.suspend();$('music').textContent='♫ Sem música';$('music').setAttribute('aria-pressed','false')}
-$('music').onclick=async()=>{if(playing){stopMusic();return}try{if(CONTENT.musicFile){if(!audio){audio=new Audio(CONTENT.musicFile);audio.loop=true;audio.volume=.3}await audio.play();playing=true}else{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error();if(!ctx){ctx=new AC();master=ctx.createGain();master.gain.value=.45;master.connect(ctx.destination)}await ctx.resume();playing=true;chord()}$('music').textContent='Ⅱ Pausar música';$('music').setAttribute('aria-pressed','true')}catch{stopMusic();$('announce').textContent='O áudio não iniciou. Você pode continuar sem música.'}};
+let musicEpoch=0;
+const previousStopMusic=stopMusic;
+stopMusic=function(){musicEpoch++;previousStopMusic()};
+async function startMusic(){
+ if(playing)return true;
+ const epoch=musicEpoch;
+ try{
+  if(CONTENT.musicFile){
+   if(!audio){audio=new Audio(CONTENT.musicFile);audio.loop=true;audio.volume=.3}
+   await audio.play();
+   if(epoch!==musicEpoch){audio.pause();return false}
+   playing=true;
+  }else{
+   const AC=window.AudioContext||window.webkitAudioContext;
+   if(!AC)return false;
+   if(!ctx){ctx=new AC();master=ctx.createGain();master.gain.value=.45;master.connect(ctx.destination)}
+   await ctx.resume();
+   if(epoch!==musicEpoch||ctx.state!=='running')return false;
+   if(!playing){playing=true;chord()}
+  }
+  $('music').textContent='Ⅱ Pausar música';
+  $('music').setAttribute('aria-pressed','true');
+  return true;
+ }catch{return false}
+}
+$('music').onclick=async()=>{
+ if(playing){stopMusic();return}
+ if(!await startMusic())$('announce').textContent='O navegador bloqueou o áudio. Toque novamente para ouvir.';
+};
+// Alguns navegadores permitem autoplay; nos demais, o primeiro clique/toque libera o som.
+function firstGiftInteraction(event){
+ document.removeEventListener('click',firstGiftInteraction,true);
+ if(!event.target.closest('#music'))void startMusic();
+}
+document.addEventListener('click',firstGiftInteraction,true);
+void startMusic();
 document.addEventListener('visibilitychange',()=>{if(document.hidden){stopMusic();document.querySelectorAll('.world *').forEach(e=>e.style.animationPlayState='paused')}else document.querySelectorAll('.world *').forEach(e=>e.style.animationPlayState='')});
 async function saveOffline(e){const b=e.currentTarget,status=$('offlineStatus');b.disabled=true;status.textContent='Guardando o jardim neste aparelho…';try{if(!('serviceWorker'in navigator))throw Error();const reg=await navigator.serviceWorker.register('./sw.js',{scope:'./'});const worker=reg.active||reg.waiting||reg.installing;if(!worker)throw Error();await new Promise((resolve,reject)=>{const channel=new MessageChannel(),t=setTimeout(()=>reject(Error()),15000);channel.port1.onmessage=event=>{clearTimeout(t);event.data.ok?resolve():reject(Error())};worker.postMessage({type:'CACHE_GARDEN'},[channel.port2])});status.textContent='Cópia preparada. Adicione à Tela de Início e teste abrir em modo avião antes de entregar.'}catch{status.textContent='Não foi possível guardar offline. Abra pelo Safari com internet e tente novamente.'}finally{b.disabled=false}}
 render();
